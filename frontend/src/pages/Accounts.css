@@ -1,0 +1,352 @@
+.accounts-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.accounts-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-2xl);
+}
+
+.summary-card {
+  background: white;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.summary-card h3 {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-sm);
+  text-transform: uppercase;
+}
+
+.summary-amount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.summary-card.assets .summary-amount {
+  color: var(--success-color);
+}
+
+.summary-card.liabilities .summary-amount {
+  color: var(--danger-color);
+}
+
+.summary-card.net-worth .summary-amount.negative {
+  color: var(--danger-color);
+}
+
+.filter-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.tab {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--gray-600);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--gray-900);
+}
+
+.tab.active {
+  color: var(--primary-green);
+  border-bottom-color: var(--primary-green);
+}
+
+.account-group {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.account-group h2 {
+  margin-bottom: var(--spacing-lg);
+  color: var(--gray-900);
+}
+
+.account-list {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.account-card-detailed {
+  background: white;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--primary-green);
+}
+
+.account-card-detailed.liability {
+  border-left-color: var(--danger-color);
+}
+
+.account-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-md);
+}
+
+.account-card-header h3 {
+  font-size: 1.25rem;
+  margin-bottom: var(--spacing-xs);
+}
+
+.account-subtype {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  text-transform: uppercase;
+}
+
+.account-balance-large {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--success-color);
+}
+
+.account-balance-large.negative {
+  color: var(--danger-color);
+}
+
+.account-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.include-badge {
+  font-size: 0.75rem;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.include-badge.included {
+  background: #D1FAE5;
+  color: var(--success-color);
+}
+
+/* src/pages/Budgets.css */
+.budgets-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.budget-summary {
+  display: flex;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  background: white;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-2xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.summary-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.summary-item span {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+.summary-item strong {
+  font-size: 1.5rem;
+  font-family: var(--font-mono);
+}
+
+.summary-item strong.over-budget {
+  color: var(--danger-color);
+}
+
+.budgets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+/* src/components/Budgets/BudgetCard.css */
+.budget-card {
+  background: white;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.budget-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.budget-card.over-budget {
+  border: 2px solid var(--danger-color);
+}
+
+.budget-card-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.category-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.category-icon {
+  font-size: 1.5rem;
+}
+
+.budget-progress {
+  margin-bottom: var(--spacing-lg);
+}
+
+.budget-progress .progress-fill.over {
+  background: var(--danger-color);
+}
+
+.progress-percentage {
+  text-align: center;
+  display: block;
+  margin-top: var(--spacing-sm);
+  font-weight: 700;
+  color: var(--gray-700);
+}
+
+.budget-amounts {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.amount-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.amount-label {
+  font-size: 0.75rem;
+  color: var(--gray-600);
+}
+
+.amount-value {
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.amount-value.over {
+  color: var(--danger-color);
+}
+
+/* src/pages/Analytics.css */
+.analytics-page {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.date-range-select {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border: 2px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-xl);
+}
+
+.analytics-card {
+  background: white;
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.analytics-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.analytics-card h2 {
+  margin-bottom: var(--spacing-xl);
+}
+
+/* src/pages/Settings.css */
+.settings-page {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-section {
+  background: white;
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-section h2 {
+  margin-bottom: var(--spacing-lg);
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.danger-zone {
+  border: 2px solid var(--danger-color);
+}
+
+/* src/pages/NotFound.css */
+.not-found-page {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.not-found-content {
+  text-align: center;
+}
+
+.not-found-content h1 {
+  font-size: 6rem;
+  color: var(--primary-green);
+  margin-bottom: var(--spacing-md);
+}
+
+.not-found-content h2 {
+  font-size: 2rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.not-found-content p {
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-xl);
+}
