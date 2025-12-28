@@ -1,31 +1,35 @@
+// utils/moneyUtils.js
+
 /**
  * Money Utilities for Subunit Handling
- * CRITICAL: All money is stored as integers in subunits (e.g., kobo for NGN)
- * This prevents floating-point arithmetic errors
+ * CRITICAL: All money is stored as POSITIVE integers in subunits (e.g., kobo for NGN)
+ * Direction is handled by DEBIT/CREDIT, NOT negative numbers
+ * This prevents floating-point arithmetic errors and ledger inconsistencies
  */
 class MoneyUtils {
   /**
    * Convert amount from main unit to subunits
    * Example: 10.50 Naira → 1050 kobo
+   * ALWAYS returns positive integer
    * 
    * @param {Number} amount - Amount in main unit (e.g., Naira)
    * @param {Number} subunitToUnit - Conversion rate (default: 100)
-   * @returns {Number} - Amount in subunits (e.g., kobo)
+   * @returns {Number} - Amount in subunits (e.g., kobo) - ALWAYS POSITIVE
    */
   static toSubunits(amount, subunitToUnit = 100) {
     if (typeof amount !== 'number' || isNaN(amount)) {
       throw new Error('Amount must be a valid number');
     }
 
-    if (amount < 0) {
-      throw new Error('Amount cannot be negative');
-    }
-
-    // Round to avoid floating point issues
-    const result = Math.round(amount * subunitToUnit);
+    // Always work with absolute value
+    const result = Math.round(Math.abs(amount) * subunitToUnit);
 
     if (!Number.isInteger(result)) {
       throw new Error('Conversion resulted in non-integer value');
+    }
+
+    if (result === 0) {
+      throw new Error('Amount must be greater than zero');
     }
 
     return result;
@@ -44,8 +48,8 @@ class MoneyUtils {
       throw new Error('Amount must be an integer');
     }
 
-    if (amount < 0) {
-      throw new Error('Amount cannot be negative');
+    if (amount <= 0) {
+      throw new Error('Amount must be a positive integer');
     }
 
     return amount / subunitToUnit;
@@ -66,14 +70,16 @@ class MoneyUtils {
       throw new Error('Amount must be an integer');
     }
 
-    const mainUnit = this.fromSubunits(amount, subunitToUnit);
+    const absAmount = Math.abs(amount);
+    const mainUnit = absAmount / subunitToUnit;
     
     const formatted = mainUnit.toLocaleString(locale, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
 
-    return `${symbol}${formatted}`;
+    const sign = amount < 0 ? '-' : '';
+    return `${sign}${symbol}${formatted}`;
   }
 
   /**
@@ -90,12 +96,16 @@ class MoneyUtils {
       throw new Error('Amount must be an integer');
     }
 
-    const mainUnit = this.fromSubunits(amount, subunitToUnit);
+    const absAmount = Math.abs(amount);
+    const mainUnit = absAmount / subunitToUnit;
     
-    return mainUnit.toLocaleString(locale, {
+    const sign = amount < 0 ? '-' : '';
+    const formatted = mainUnit.toLocaleString(locale, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+    
+    return `${sign}${formatted}`;
   }
 
   /**
@@ -205,8 +215,9 @@ class MoneyUtils {
       throw new Error('Parts must be a positive integer');
     }
 
-    const baseAmount = Math.floor(amount / parts);
-    const remainder = amount % parts;
+    const absAmount = Math.abs(amount);
+    const baseAmount = Math.floor(absAmount / parts);
+    const remainder = absAmount % parts;
 
     const result = new Array(parts).fill(baseAmount);
     
@@ -280,7 +291,8 @@ class MoneyUtils {
   }
 
   /**
-   * Validate amount
+   * Validate amount for transactions
+   * STRICT: Must be positive integer > 0
    * 
    * @param {Number} amount - Amount to validate
    * @returns {Object} - { valid, error }
@@ -300,10 +312,10 @@ class MoneyUtils {
       };
     }
 
-    if (amount < 0) {
+    if (amount <= 0) {
       return {
         valid: false,
-        error: 'Amount cannot be negative'
+        error: 'Amount must be a positive integer greater than zero'
       };
     }
 
@@ -326,34 +338,41 @@ class MoneyUtils {
       throw new Error('Amount must be a valid number');
     }
 
-    return Math.round(amount * subunitToUnit);
+    const result = Math.round(Math.abs(amount) * subunitToUnit);
+    
+    if (result === 0) {
+      throw new Error('Amount must be greater than zero');
+    }
+
+    return result;
   }
 
   /**
    * Parse string input to subunits
    * Handles common formats: "1000", "1,000", "1000.50", "1,000.50"
+   * ALWAYS returns positive integer
    * 
    * @param {String} input - String to parse
    * @param {Number} subunitToUnit - Conversion rate (default: 100)
-   * @returns {Number} - Amount in subunits
+   * @returns {Number} - Amount in subunits (POSITIVE)
    */
   static parse(input, subunitToUnit = 100) {
     if (typeof input === 'number') {
-      return this.toSubunits(input, subunitToUnit);
+      return this.toSubunits(Math.abs(input), subunitToUnit);
     }
 
     if (typeof input !== 'string') {
       throw new Error('Input must be a string or number');
     }
 
-    // Remove currency symbols and spaces
-    let cleaned = input.replace(/[₦$€£,\s]/g, '');
+    // Remove currency symbols, spaces, and negative signs
+    let cleaned = input.replace(/[₦$€£,\s-]/g, '');
 
     // Parse as float
     const parsed = parseFloat(cleaned);
 
-    if (isNaN(parsed)) {
-      throw new Error('Invalid amount format');
+    if (isNaN(parsed) || parsed <= 0) {
+      throw new Error('Invalid amount format or amount must be greater than zero');
     }
 
     return this.toSubunits(parsed, subunitToUnit);

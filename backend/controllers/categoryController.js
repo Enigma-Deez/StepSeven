@@ -1,5 +1,5 @@
 const Category = require('../models/Category');
-
+const logger = require('../utils/logger');
 class CategoryController {
   /**
    * Get all categories for the authenticated user

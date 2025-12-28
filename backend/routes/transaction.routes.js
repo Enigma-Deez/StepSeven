@@ -3,20 +3,18 @@ const router = express.Router();
 const TransactionController = require('../controllers/transactionController');
 const TransferController = require('../controllers/transferController');
 const { checkAuth } = require('../middleware/auth');
+const { writeLimiter } = require('../middleware/rateLimiter');
 
-// All routes require authentication
 router.use(checkAuth);
 
-// Regular transactions
 router.get('/', TransactionController.getTransactions);
 router.get('/:id', TransactionController.getTransaction);
-router.post('/', TransactionController.createTransaction);
-router.put('/:id', TransactionController.updateTransaction);
-router.delete('/:id', TransactionController.deleteTransaction);
+router.post('/', writeLimiter, TransactionController.createTransaction);
+router.put('/:id', writeLimiter, TransactionController.updateTransaction);
+router.delete('/:id', writeLimiter, TransactionController.deleteTransaction);
 
-// Transfers
-router.post('/transfer', TransferController.createTransfer);
-router.put('/transfer/:id', TransferController.updateTransfer);
-router.delete('/transfer/:id', TransferController.deleteTransfer);
+router.post('/transfer', writeLimiter, TransferController.createTransfer);
+router.put('/transfer/:id', writeLimiter, TransferController.updateTransfer);
+router.delete('/transfer/:id', writeLimiter, TransferController.deleteTransfer);
 
 module.exports = router;

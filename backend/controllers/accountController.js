@@ -109,10 +109,15 @@ class AccountController {
 
       // Validate and convert balance
       let balanceInSubunits = 0;
-      if (balance) {
-        balanceInSubunits = typeof balance === 'number' 
-          ? MoneyUtils.toSubunits(balance)
-          : MoneyUtils.parse(balance.toString());
+      if (balance && balance !== 0) {
+        const balanceNum = parseFloat(balance);
+        if (balanceNum < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Balance cannot be negative'
+          });
+        }
+        balanceInSubunits = MoneyUtils.toSubunits(Math.abs(balanceNum));
       }
 
       const accountData = {
@@ -131,7 +136,7 @@ class AccountController {
       // Add type-specific details
       if (subType.toUpperCase() === 'CREDIT_CARD' && creditCardDetails) {
         accountData.creditCardDetails = {
-          creditLimit: MoneyUtils.toSubunits(creditCardDetails.creditLimit || 0),
+          creditLimit: MoneyUtils.toSubunits(Math.abs(parseFloat(creditCardDetails.creditLimit || 0))),
           billingCycleDay: creditCardDetails.billingCycleDay,
           statementDate: creditCardDetails.statementDate,
           dueDate: creditCardDetails.dueDate
@@ -140,9 +145,9 @@ class AccountController {
 
       if (subType.toUpperCase() === 'LOAN' && loanDetails) {
         accountData.loanDetails = {
-          originalAmount: MoneyUtils.toSubunits(loanDetails.originalAmount || 0),
+          originalAmount: MoneyUtils.toSubunits(Math.abs(parseFloat(loanDetails.originalAmount || 0))),
           interestRate: loanDetails.interestRate,
-          minimumPayment: MoneyUtils.toSubunits(loanDetails.minimumPayment || 0),
+          minimumPayment: MoneyUtils.toSubunits(Math.abs(parseFloat(loanDetails.minimumPayment || 0))),
           startDate: loanDetails.startDate,
           endDate: loanDetails.endDate
         };
@@ -191,15 +196,15 @@ class AccountController {
 
       // Convert monetary values if present
       if (updates.creditCardDetails?.creditLimit) {
-        updates.creditCardDetails.creditLimit = MoneyUtils.toSubunits(updates.creditCardDetails.creditLimit);
+        updates.creditCardDetails.creditLimit = MoneyUtils.toSubunits(Math.abs(parseFloat(updates.creditCardDetails.creditLimit)));
       }
 
       if (updates.loanDetails) {
         if (updates.loanDetails.originalAmount) {
-          updates.loanDetails.originalAmount = MoneyUtils.toSubunits(updates.loanDetails.originalAmount);
+          updates.loanDetails.originalAmount = MoneyUtils.toSubunits(Math.abs(parseFloat(updates.loanDetails.originalAmount)));
         }
         if (updates.loanDetails.minimumPayment) {
-          updates.loanDetails.minimumPayment = MoneyUtils.toSubunits(updates.loanDetails.minimumPayment);
+          updates.loanDetails.minimumPayment = MoneyUtils.toSubunits(Math.abs(parseFloat(updates.loanDetails.minimumPayment)));
         }
       }
 
@@ -336,13 +341,15 @@ class AccountController {
       const formatted = {
         assets: MoneyUtils.format(totals.assets, req.user.currency.symbol, req.user.currency.subunitToUnit),
         liabilities: MoneyUtils.format(totals.liabilities, req.user.currency.symbol, req.user.currency.subunitToUnit),
-        netWorth: MoneyUtils.format(totals.netWorth, req.user.currency.symbol, req.user.currency.subunitToUnit)
+        netWorth: MoneyUtils.format(Math.abs(totals.netWorth), req.user.currency.symbol, req.user.currency.subunitToUnit)
       };
 
       res.json({
         success: true,
         data: {
-          ...totals,
+          assets: totals.assets,
+          liabilities: totals.liabilities,
+          netWorth: totals.netWorth,
           formatted
         }
       });

@@ -1,15 +1,12 @@
 const express = require('express');
-const router = express.Router();
-const BabyStepController = require('../controllers/babyStepController');
+const babyStepRouter = express.Router(); // Match this name
 const { checkAuth } = require('../middleware/auth');
+const BabyStepController = require('../controllers/babyStepController');
 
-router.use(checkAuth);
+babyStepRouter.use(checkAuth);
 
-router.get('/progress', BabyStepController.getProgress);
-router.post('/recalculate', BabyStepController.recalculate);
-router.put('/targets', BabyStepController.updateTargets);
-router.get('/gazelle-intensity', BabyStepController.getGazelleIntensity);
-router.get('/smallest-debt', BabyStepController.getSmallestDebt);
-router.post('/mark-complete/:step', BabyStepController.markStepComplete);
+babyStepRouter.get('/progress', BabyStepController.getProgress);
+babyStepRouter.get('/gazelle-intensity', BabyStepController.getGazelleIntensity);
+babyStepRouter.get('/smallest-debt', BabyStepController.getSmallestDebt);
 
-module.exports = router;
+module.exports = babyStepRouter;

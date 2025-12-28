@@ -3,45 +3,52 @@ const Transaction = require('../models/Transaction');
 const Account = require('../models/Account');
 const Category = require('../models/Category');
 const LedgerService = require('../services/ledgerService');
+const BudgetService = require('../services/budgetService');
 const PaginationService = require('../services/paginationService');
+const DateUtils = require('../utils/dateUtils');
+const MoneyUtils = require('../utils/moneyUtils');
+const logger = require('../utils/logger');
 
 class TransactionController {
   /**
-   * Create a new transaction (INCOME, EXPENSE, or TRANSFER)
+   * Create transaction (INCOME or EXPENSE)
+   * POST /api/transactions
    */
   static async createTransaction(req, res) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      const { type, amount, account, toAccount, category, date, description, notes, tags } = req.body;
+      const { type, amount, account, category, date, description, notes, tags } = req.body;
       const userId = req.user.id;
-      const amountKobo = Math.round(Number(amount));
 
-      // 1. Validation Logic
+      // Validate amount
+      const amountInSubunits = MoneyUtils.parse(amount.toString());
+
+      // Validate ownership
       const accountDoc = await Account.findOne({ _id: account, user: userId }).session(session);
-      if (!accountDoc) throw new Error('Source account not found or unauthorized');
-
-      // Handle TRANSFER vs INCOME/EXPENSE
-      if (type === 'TRANSFER') {
-        if (!toAccount) throw new Error('Destination account required for transfers');
-        const toAccountDoc = await Account.findOne({ _id: toAccount, user: userId }).session(session);
-        if (!toAccountDoc) throw new Error('Destination account not found');
-      } else {
-        const categoryDoc = await Category.findOne({ _id: category, user: userId }).session(session);
-        if (!categoryDoc) throw new Error('Category required for income/expense');
-        if (categoryDoc.type !== type) throw new Error(`Category type mismatch: ${type}`);
+      if (!accountDoc) {
+        throw new Error('Account not found or unauthorized');
       }
 
-      // 2. Create Transaction Record
+      const categoryDoc = await Category.findOne({ _id: category, user: userId }).session(session);
+      if (!categoryDoc) {
+        throw new Error('Category not found or unauthorized');
+      }
+
+      // Validate category type matches transaction type
+      if (categoryDoc.type !== type) {
+        throw new Error(`Category type must be ${type}`);
+      }
+
+      // Create transaction
       const transaction = new Transaction({
         user: userId,
-        type, // Must match schema enum: INCOME, EXPENSE, TRANSFER
-        amount: amountKobo,
+        type,
+        amount: amountInSubunits,
         account,
-        toAccount: type === 'TRANSFER' ? toAccount : undefined,
-        category: type !== 'TRANSFER' ? category : undefined,
-        date: date || new Date(),
+        category,
+        date: date || new Date().toISOString(),
         description,
         notes,
         tags
@@ -49,32 +56,43 @@ class TransactionController {
 
       await transaction.save({ session });
 
-      // 3. Update Balances via Ledger Service
+      // Update account balance via ledger
       if (type === 'INCOME') {
-        await LedgerService.recordIncome(account, amountKobo, session);
+        await LedgerService.recordIncome(account, transaction.amount, session);
       } else if (type === 'EXPENSE') {
-        await LedgerService.recordExpense(account, amountKobo, session);
-      } else if (type === 'TRANSFER') {
-        await LedgerService.recordTransfer(account, toAccount, amountKobo, session);
+        await LedgerService.recordExpense(account, transaction.amount, session);
+        
+        // Update budget spent
+        const periodKey = DateUtils.getMonthlyPeriodKey(new Date(date));
+        await BudgetService.updateBudgetSpent(userId, category, periodKey);
       }
 
       await session.commitTransaction();
 
       // Populate for response
-      await transaction.populate(['account', 'toAccount', 'category']);
+      await transaction.populate(['account', 'category']);
 
-      res.status(201).json({ success: true, data: transaction });
+      logger.info(`Created ${type} transaction ${transaction._id} for user ${userId}`);
+
+      res.status(201).json({
+        success: true,
+        data: transaction
+      });
     } catch (error) {
       await session.abortTransaction();
-      res.status(400).json({ success: false, message: error.message });
+      logger.error('Create transaction error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
     } finally {
       session.endSession();
     }
   }
 
   /**
-   * Update an existing transaction
-   * Logic: Reverse old effect -> Save new data -> Apply new effect
+   * Update transaction
+   * PUT /api/transactions/:id
    */
   static async updateTransaction(req, res) {
     const session = await mongoose.startSession();
@@ -85,42 +103,94 @@ class TransactionController {
       const userId = req.user.id;
       const updates = req.body;
 
-      const existingTransaction = await Transaction.findOne({ _id: id, user: userId }).session(session);
-      if (!existingTransaction) throw new Error('Transaction not found');
+      // Find existing transaction
+      const existingTransaction = await Transaction.findOne({
+        _id: id,
+        user: userId
+      }).session(session);
 
-      // REVERSE OLD EFFECT FIRST
+      if (!existingTransaction) {
+        throw new Error('Transaction not found or unauthorized');
+      }
+
+      // CRITICAL: Reverse old transaction's effect
       await LedgerService.reverseTransaction(existingTransaction, session);
 
-      // APPLY UPDATES TO OBJECT
-      if (updates.amount) updates.amount = Math.round(Number(updates.amount));
-      Object.assign(existingTransaction, updates);
+      // Validate new amount if provided
+      if (updates.amount) {
+        updates.amount = MoneyUtils.parse(updates.amount.toString());
+      }
+
+      // Validate new account if changed
+      if (updates.account && updates.account !== existingTransaction.account.toString()) {
+        const newAccount = await Account.findOne({
+          _id: updates.account,
+          user: userId
+        }).session(session);
+        if (!newAccount) {
+          throw new Error('New account not found or unauthorized');
+        }
+      }
+
+      // Validate new category if changed
+      if (updates.category && updates.category !== existingTransaction.category.toString()) {
+        const newCategory = await Category.findOne({
+          _id: updates.category,
+          user: userId
+        }).session(session);
+        if (!newCategory) {
+          throw new Error('New category not found or unauthorized');
+        }
+
+        const transactionType = updates.type || existingTransaction.type;
+        if (newCategory.type !== transactionType) {
+          throw new Error(`Category type must be ${transactionType}`);
+        }
+      }
+
+      // Apply updates
+      Object.keys(updates).forEach(key => {
+        existingTransaction[key] = updates[key];
+      });
 
       await existingTransaction.save({ session });
 
-      // APPLY NEW EFFECT
-      const { type, account, toAccount, amount } = existingTransaction;
-      if (type === 'INCOME') {
-        await LedgerService.recordIncome(account, amount, session);
-      } else if (type === 'EXPENSE') {
-        await LedgerService.recordExpense(account, amount, session);
-      } else if (type === 'TRANSFER') {
-        await LedgerService.recordTransfer(account, toAccount, amount, session);
+      // Apply new transaction's effect
+      const finalType = existingTransaction.type;
+      const finalAccount = existingTransaction.account;
+      const finalAmount = existingTransaction.amount;
+
+      if (finalType === 'INCOME') {
+        await LedgerService.recordIncome(finalAccount, finalAmount, session);
+      } else if (finalType === 'EXPENSE') {
+        await LedgerService.recordExpense(finalAccount, finalAmount, session);
       }
 
       await session.commitTransaction();
-      await existingTransaction.populate(['account', 'toAccount', 'category']);
 
-      res.json({ success: true, data: existingTransaction });
+      await existingTransaction.populate(['account', 'category']);
+
+      logger.info(`Updated transaction ${id} for user ${userId}`);
+
+      res.json({
+        success: true,
+        data: existingTransaction
+      });
     } catch (error) {
       await session.abortTransaction();
-      res.status(400).json({ success: false, message: error.message });
+      logger.error('Update transaction error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
     } finally {
       session.endSession();
     }
   }
 
   /**
-   * Delete a transaction
+   * Delete transaction
+   * DELETE /api/transactions/:id
    */
   static async deleteTransaction(req, res) {
     const session = await mongoose.startSession();
@@ -139,13 +209,15 @@ class TransactionController {
         throw new Error('Transaction not found or unauthorized');
       }
 
-      // Reverse the transaction's effect
+      // Reverse transaction's effect
       await LedgerService.reverseTransaction(transaction, session);
 
-      // Delete the transaction
+      // Delete transaction
       await Transaction.deleteOne({ _id: id }).session(session);
 
       await session.commitTransaction();
+
+      logger.info(`Deleted transaction ${id} for user ${userId}`);
 
       res.json({
         success: true,
@@ -153,6 +225,7 @@ class TransactionController {
       });
     } catch (error) {
       await session.abortTransaction();
+      logger.error('Delete transaction error:', error);
       res.status(400).json({
         success: false,
         message: error.message
@@ -164,6 +237,7 @@ class TransactionController {
 
   /**
    * Get transactions with pagination
+   * GET /api/transactions
    */
   static async getTransactions(req, res) {
     try {
@@ -210,11 +284,9 @@ class TransactionController {
       // Paginate
       const result = await PaginationService.paginate(query, parseInt(page), parseInt(limit));
 
-      res.json({
-        success: true,
-        ...result
-      });
+      res.json(result);
     } catch (error) {
+      logger.error('Get transactions error:', error);
       res.status(400).json({
         success: false,
         message: error.message
@@ -223,7 +295,8 @@ class TransactionController {
   }
 
   /**
-   * Get a single transaction
+   * Get single transaction
+   * GET /api/transactions/:id
    */
   static async getTransaction(req, res) {
     try {
@@ -251,6 +324,7 @@ class TransactionController {
         data: transaction
       });
     } catch (error) {
+      logger.error('Get transaction error:', error);
       res.status(400).json({
         success: false,
         message: error.message

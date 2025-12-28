@@ -1,14 +1,11 @@
 const express = require('express');
-const router = express.Router();
-const AnalyticsController = require('../controllers/analyticsController');
+const analyticsRouter = express.Router(); // Change 'router' to 'analyticsRouter'
 const { checkAuth } = require('../middleware/auth');
+const AnalyticsController = require('../controllers/analyticsController');
 
-router.use(checkAuth);
+analyticsRouter.use(checkAuth);
 
-router.get('/expenses-by-category', AnalyticsController.getExpensesByCategory);
-router.get('/monthly-cashflow', AnalyticsController.getMonthlyCashFlow);
-router.get('/net-worth', AnalyticsController.getNetWorth);
-router.get('/spending-trends', AnalyticsController.getSpendingTrends);
-router.get('/budget-comparison', AnalyticsController.getBudgetComparison);
+analyticsRouter.get('/expenses-by-category', AnalyticsController.getExpensesByCategory);
+analyticsRouter.get('/monthly-cashflow', AnalyticsController.getMonthlyCashFlow);
 
-module.exports = router;
+module.exports = analyticsRouter;

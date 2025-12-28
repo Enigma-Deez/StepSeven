@@ -1,6 +1,7 @@
 class TransferController {
   /**
-   * Create a transfer between two accounts
+   * Create transfer
+   * POST /api/transactions/transfer
    */
   static async createTransfer(req, res) {
     const session = await mongoose.startSession();
@@ -10,7 +11,10 @@ class TransferController {
       const { amount, fromAccount, toAccount, date, description, notes } = req.body;
       const userId = req.user.id;
 
-      // Validate both accounts belong to user
+      // Validate amount
+      const amountInSubunits = MoneyUtils.parse(amount.toString());
+
+      // Validate both accounts
       const [sourceAccount, destinationAccount] = await Promise.all([
         Account.findOne({ _id: fromAccount, user: userId }).session(session),
         Account.findOne({ _id: toAccount, user: userId }).session(session)
@@ -24,8 +28,8 @@ class TransferController {
         throw new Error('Cannot transfer to the same account');
       }
 
-      // Check sufficient balance in source account
-      if (sourceAccount.type === 'ASSET' && sourceAccount.balance < parseInt(amount)) {
+      // Check sufficient balance
+      if (sourceAccount.type === 'ASSET' && sourceAccount.balance < amountInSubunits) {
         throw new Error('Insufficient balance in source account');
       }
 
@@ -33,7 +37,7 @@ class TransferController {
       const transfer = new Transaction({
         user: userId,
         type: 'TRANSFER',
-        amount: parseInt(amount),
+        amount: amountInSubunits,
         fromAccount,
         toAccount,
         date: date || new Date().toISOString(),
@@ -48,8 +52,9 @@ class TransferController {
 
       await session.commitTransaction();
 
-      // Populate for response
       await transfer.populate(['fromAccount', 'toAccount']);
+
+      logger.info(`Created transfer ${transfer._id} for user ${userId}`);
 
       res.status(201).json({
         success: true,
@@ -57,6 +62,7 @@ class TransferController {
       });
     } catch (error) {
       await session.abortTransaction();
+      logger.error('Create transfer error:', error);
       res.status(400).json({
         success: false,
         message: error.message
@@ -67,7 +73,8 @@ class TransferController {
   }
 
   /**
-   * Update a transfer
+   * Update transfer
+   * PUT /api/transactions/transfer/:id
    */
   static async updateTransfer(req, res) {
     const session = await mongoose.startSession();
@@ -89,10 +96,15 @@ class TransferController {
         throw new Error('Transfer not found or unauthorized');
       }
 
-      // Reverse the old transfer
+      // Reverse old transfer
       await LedgerService.reverseTransaction(existingTransfer, session);
 
-      // Validate new accounts if changed
+      // Validate new amount
+      if (updates.amount) {
+        updates.amount = MoneyUtils.parse(updates.amount.toString());
+      }
+
+      // Validate new accounts
       if (updates.fromAccount || updates.toAccount) {
         const fromAccountId = updates.fromAccount || existingTransfer.fromAccount;
         const toAccountId = updates.toAccount || existingTransfer.toAccount;
@@ -113,16 +125,12 @@ class TransferController {
 
       // Apply updates
       Object.keys(updates).forEach(key => {
-        if (key === 'amount') {
-          existingTransfer[key] = parseInt(updates[key]);
-        } else {
-          existingTransfer[key] = updates[key];
-        }
+        existingTransfer[key] = updates[key];
       });
 
       await existingTransfer.save({ session });
 
-      // Apply the new transfer
+      // Apply new transfer
       await LedgerService.recordTransfer(
         existingTransfer.fromAccount,
         existingTransfer.toAccount,
@@ -134,12 +142,15 @@ class TransferController {
 
       await existingTransfer.populate(['fromAccount', 'toAccount']);
 
+      logger.info(`Updated transfer ${id} for user ${userId}`);
+
       res.json({
         success: true,
         data: existingTransfer
       });
     } catch (error) {
       await session.abortTransaction();
+      logger.error('Update transfer error:', error);
       res.status(400).json({
         success: false,
         message: error.message
@@ -150,7 +161,8 @@ class TransferController {
   }
 
   /**
-   * Delete a transfer
+   * Delete transfer
+   * DELETE /api/transactions/transfer/:id
    */
   static async deleteTransfer(req, res) {
     const session = await mongoose.startSession();
@@ -170,13 +182,15 @@ class TransferController {
         throw new Error('Transfer not found or unauthorized');
       }
 
-      // Reverse the transfer
+      // Reverse transfer
       await LedgerService.reverseTransaction(transfer, session);
 
-      // Delete the transfer
+      // Delete transfer
       await Transaction.deleteOne({ _id: id }).session(session);
 
       await session.commitTransaction();
+
+      logger.info(`Deleted transfer ${id} for user ${userId}`);
 
       res.json({
         success: true,
@@ -184,6 +198,7 @@ class TransferController {
       });
     } catch (error) {
       await session.abortTransaction();
+      logger.error('Delete transfer error:', error);
       res.status(400).json({
         success: false,
         message: error.message
