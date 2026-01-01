@@ -1,28 +1,47 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const User = require('./models/User');
 const Category = require('./models/Category');
 const Account = require('./models/Account');
 const Transaction = require('./models/Transaction');
 const LedgerService = require('./services/ledgerService');
 
-// 1. HARDCODE THE URI TEMPORARILY
-// Replace this with your actual MongoDB string from your Atlas dashboard
-const URI = "mongodb+srv://cosmosjay21_db_user:x6MDW5Kfpjd2ks8l@cluster0.lcj99yy.mongodb.net/?appName=Cluster0";
-
-const USER_ID = "694d74a7f580679937b8c50e"; 
+const URI = "mongodb+srv://cosmosjay21_db_user:x6MDW5Kfpjd2ks8l@cluster0.lcj99yy.mongodb.net/?appName=Cluster0"; // Replace with your string
 
 async function runSeed() {
     try {
         console.log("🚀 Starting Seed Process...");
         await mongoose.connect(URI);
-        console.log("✅ Connected to MongoDB");
+        
+        // 1. CLEANUP EVERYTHING
+        console.log("🧹 Wiping database...");
+        await Promise.all([
+            User.deleteMany({}),
+            Category.deleteMany({}),
+            Account.deleteMany({}),
+            Transaction.deleteMany({})
+        ]);
 
-        // CLEANUP
-        console.log("🧹 Wiping old data...");
-        await Category.deleteMany({ user: USER_ID });
-        await Account.deleteMany({ user: USER_ID });
-        await Transaction.deleteMany({ user: USER_ID });
+        // 2. CREATE THE USER (Your Login Credentials)
+        console.log("👤 Creating User...");
 
-        // CATEGORIES
+        const user = await User.create({
+            firstName: 'Demo',
+            lastName: 'User',
+            email: 'demo@stepseven.app',
+            password: 'password123',
+            isActive: true, // IMPORTANT: Your controller checks for this!
+            currency: {
+                code: 'NGN',
+                symbol: '₦',
+                subunitName: 'kobo',
+                subunitToUnit: 100
+            }
+        });
+
+        const USER_ID = user._id;
+
+        // 3. CATEGORIES
         console.log("📂 Creating Categories...");
         const cats = await Category.insertMany([
             { name: 'Salary', type: 'INCOME', icon: 'cash', color: '#4CAF50', user: USER_ID },
@@ -30,8 +49,8 @@ async function runSeed() {
             { name: 'Rent', type: 'EXPENSE', icon: 'home', color: '#2196F3', user: USER_ID }
         ]);
 
-        // ACCOUNTS
-        console.log("🏦 Creating Accounts...");
+        // 4. ACCOUNTS
+        console.log("🏦 Creating Account...");
         const gtBank = await Account.create({
             name: 'GTBank Savings',
             type: 'ASSET',
@@ -40,27 +59,43 @@ async function runSeed() {
             user: USER_ID
         });
 
-        // TRANSACTIONS (Using LedgerService to handle the math)
+        // 5. TRANSACTIONS
         console.log("💰 Recording Initial Income...");
-        const income = 50000000; // 500k Naira (in Kobo)
+        const income = 50000000; // ₦500k in kobo
+
         await Transaction.create({
-            user: USER_ID, type: 'INCOME', amount: income, account: gtBank._id,
-            category: cats[0]._id, description: 'Opening Balance', date: new Date()
+            user: USER_ID, 
+            type: 'INCOME', 
+            amount: income, 
+            account: gtBank._id,
+            category: cats[0]._id, 
+            description: 'Opening Balance', 
+            // .toISOString() ensures it matches "YYYY-MM-DDTHH:mm:ss.sssZ"
+            date: new Date().toISOString() 
         });
         await LedgerService.recordIncome(gtBank._id, income);
 
-        console.log("💸 Recording Grocery Expense...");
-        const expense = 2500000; // 25k Naira (in Kobo)
+        console.log("💸 Recording Initial Expense...");
+        const expense = 500000; // ₦5k
         await Transaction.create({
-            user: USER_ID, type: 'EXPENSE', amount: expense, account: gtBank._id,
-            category: cats[1]._id, description: 'Grocery shopping', date: new Date()
+            user: USER_ID,
+            type: 'EXPENSE',
+            amount: expense,
+            account: gtBank._id,
+            category: cats[1]._id,
+            description: 'Initial Seed Expense',
+            date: new Date().toISOString() // Fixed here too
         });
         await LedgerService.recordExpense(gtBank._id, expense);
-
         console.log(`
         ------------------------------------
         ✨ SEEDING SUCCESSFUL!
-        GTBank Final Balance: ₦${(income - expense) / 100}
+        
+        LOGIN CREDENTIALS:
+        Email: demo@stepseven.app
+        Password: password123
+        
+        Initial Balance: ₦${income / 100}
         ------------------------------------
         `);
         

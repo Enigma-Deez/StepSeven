@@ -1,25 +1,15 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+// src/pages/Login.jsx
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import '../styles/components/Auth.css';
+import '../styles/Auth.css';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,7 +20,7 @@ const Login = () => {
       await login(formData);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -53,13 +43,11 @@ const Login = () => {
             <label>Email Address</label>
             <input
               type="email"
-              name="email"
               value={formData.email}
-              onChange={handleChange}
+              onChange={(e) => setFormData({...formData, email: e.target.value})}
               placeholder="you@example.com"
               required
               autoFocus
-              className="form-input"
             />
           </div>
 
@@ -67,20 +55,14 @@ const Login = () => {
             <label>Password</label>
             <input
               type="password"
-              name="password"
               value={formData.password}
-              onChange={handleChange}
+              onChange={(e) => setFormData({...formData, password: e.target.value})}
               placeholder="••••••••"
               required
-              className="form-input"
             />
           </div>
 
-          <button 
-            type="submit" 
-            className="btn-primary btn-full"
-            disabled={loading}
-          >
+          <button type="submit" disabled={loading}>
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
 
@@ -88,12 +70,6 @@ const Login = () => {
             Don't have an account? <Link to="/register">Create one</Link>
           </p>
         </form>
-
-        <div className="demo-credentials">
-          <p><strong>Demo Account:</strong></p>
-          <p>Email: demo@stepseven.app</p>
-          <p>Password: password123</p>
-        </div>
       </div>
     </div>
   );
